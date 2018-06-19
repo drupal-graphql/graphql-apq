@@ -1,0 +1,13 @@
+services:
+  graphql_apq.route_enhancer.query:
+    class: Drupal\graphql_apq\Routing\APQRouteEnhancer
+    arguments: ['@graphql.query_provider']
+    tags:
+      - { name: route_enhancer, priority: -10 }
+
+  # Custom query provider for APQ logic.
+  graphql_apq.query_provider.query_map.entity:
+    class: Drupal\graphql_apq\GraphQL\QueryProvider\APQQueryMapQueryProvider
+    arguments: ['@entity_type.manager']
+    tags:
+        - { name: graphql_query_provider, priority: 10 }
