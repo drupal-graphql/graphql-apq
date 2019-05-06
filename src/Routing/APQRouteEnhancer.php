@@ -2,9 +2,8 @@
 
 namespace Drupal\graphql_apq\Routing;
 
-use Drupal\Component\Utility\NestedArray;
-use Symfony\Component\HttpFoundation\Request;
 use Drupal\graphql\Routing\QueryRouteEnhancer;
+use Symfony\Component\HttpFoundation\Request;
 
 class APQRouteEnhancer extends QueryRouteEnhancer {
 
@@ -12,19 +11,19 @@ class APQRouteEnhancer extends QueryRouteEnhancer {
    * {@inheritdoc}
    */
   public function enhance(array $defaults, Request $request) {
-    $operation = &$defaults['operations'];
-    $extensions = $operation->getOriginalInput('extensions');
-
-    if (empty($operation->queryId) && !empty($extensions['persistedQuery'])) {
-      $persistedQuery = $extensions['persistedQuery'];
-      $defaults['operations']->queryId = "{$persistedQuery['version']}:{$persistedQuery['sha256Hash']}";
-      $defaults['operations']->originalQuery = $defaults['operations']->query;
-      // Current GraphQL implementation understands "queryId" and "query"
-      // as exlusive parameters.
+    if ($persistedQuery = $this->persistedQuery($defaults)) {
+      $defaults['_controller'] = "\Drupal\graphql_apq\Controller\APQRequestController::handleRequest";
+      if (empty($defaults['operations']->queryId)) {
+        $defaults['operations']->queryId = "{$persistedQuery['version']}:{$persistedQuery['sha256Hash']}";
+      }
       $defaults['operations']->query = NULL;
     }
-
     return $defaults;
+  }
+
+  private function persistedQuery(array $defaults) {
+    $extensions = $defaults['operations']->getOriginalInput('extensions');
+    return empty($extensions['persistedQuery']) ? false : $extensions['persistedQuery'];
   }
 
 }
