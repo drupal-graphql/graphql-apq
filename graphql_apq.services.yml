@@ -10,4 +10,13 @@ services:
     class: Drupal\graphql_apq\GraphQL\QueryProvider\APQQueryMapQueryProvider
     arguments: ['@entity_type.manager']
     tags:
-        - { name: graphql_query_provider, priority: 10 }
+      - { name: graphql_query_provider, priority: 10 }
+
+  # Schema and processor factory.
+  graphql_apq.query_processor:
+    class: Drupal\graphql_apq\GraphQL\Execution\APQQueryProcessor
+    arguments:
+      - '@cache_contexts_manager'
+      - '@plugin.manager.graphql.schema'
+      - '@cache.graphql.results'
+      - '@request_stack'
