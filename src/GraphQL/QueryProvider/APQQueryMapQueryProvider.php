@@ -2,9 +2,10 @@
 
 namespace Drupal\graphql_apq\GraphQL\QueryProvider;
 
+use Drupal\Core\Cache\Cache;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use GraphQL\Server\OperationParams;
-use GraphQL\Server\RequestError;
+use Drupal\graphql\GraphQL\Cache\CacheableRequestError;
 use Drupal\graphql\GraphQL\QueryProvider\QueryProviderInterface;
 
 class APQQueryMapQueryProvider implements QueryProviderInterface {
@@ -73,15 +74,33 @@ class APQQueryMapQueryProvider implements QueryProviderInterface {
 
       $apq->save();
 
+      // Invalidate previous not found response.
+      Cache::invalidateTags([$this->getCacheTag($hash)]);
+
       return $operation->originalQuery;
     }
 
     // In case no query is set after all tries,
     // respond with PersistedQueryNotFound to allow fulfilling.
     if (empty($operation->originalQuery)) {
-      throw new RequestError('PersistedQueryNotFound');
+      throw (new CacheableRequestError('PersistedQueryNotFound'))
+        ->addCacheTags([$this->getCacheTag($hash)]);
     }
 
     return NULL;
   }
+
+  /**
+   * Get query's hash cache-tag.
+   *
+   * @param String $hash
+   *   Hash from GraphQL Query.
+   *
+   * @return String
+   *   Cache tag form query's hash.
+   */
+  public function getCacheTag($hash) {
+    return 'apq:' . substr($hash, 0, 9);
+  }
+
 }
