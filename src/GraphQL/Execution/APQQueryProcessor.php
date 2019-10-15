@@ -2,12 +2,14 @@
 
 namespace Drupal\graphql_apq\GraphQL\Execution;
 
-use Drupal\graphql\GraphQL\Execution\QueryProcessor;
-use GraphQL\Language\AST\DocumentNode;
-use GraphQL\Language\Parser;
-use GraphQL\Server\OperationParams;
-use GraphQL\Server\ServerConfig;
 use Drupal\Core\Cache\Cache;
+use GraphQL\Language\Parser;
+use GraphQL\Server\ServerConfig;
+use GraphQL\Server\OperationParams;
+use GraphQL\Language\AST\DocumentNode;
+use Drupal\graphql\GraphQL\Execution\QueryResult;
+use Drupal\graphql\GraphQL\Execution\QueryProcessor;
+use GraphQL\Validator\DocumentValidator;
 
 class APQQueryProcessor extends QueryProcessor {
 
@@ -19,7 +21,16 @@ class APQQueryProcessor extends QueryProcessor {
     $plugin = $this->pluginManager->createInstance($schema);
     $config = $plugin->getServer();
 
-    $this->storeAPQQuery($config, $params);
+    // Store query when present.
+    if (!empty($params->getOriginalInput('query'))) {
+      // Validate query before storing.
+      $errors = $this->validateAPQQuery($config, $params);
+      if (is_array($errors)) {
+        return new QueryResult(NULL, $errors);
+      }
+
+      $this->storeAPQQuery($params);
+    }
 
     if (is_array($params)) {
       return $this->executeBatch($config, $params);
@@ -31,23 +42,12 @@ class APQQueryProcessor extends QueryProcessor {
   /**
    * Store APQ Query.
    *
-   * @param \GraphQL\Server\ServerConfig $config
    * @param \GraphQL\Server\OperationParams $params
    *
    * @throws \GraphQL\Error\SyntaxError
    * @throws \GraphQL\Server\RequestError
    */
-  private function storeAPQQuery(ServerConfig $config, OperationParams $params) {
-    // Request without query.
-    if (empty($params->getOriginalInput('query'))) {
-      return;
-    }
-
-    // Query is invalid.
-    if (!$this->validateAPQQuery($config, $params)) {
-      return;
-    }
-
+  private function storeAPQQuery(OperationParams $params) {
     $persistedQuery = $this->persistedQuery($params);
     $storage = \Drupal::entityTypeManager()->getStorage('apq_query_map');
 
@@ -81,38 +81,27 @@ class APQQueryProcessor extends QueryProcessor {
    * @param \GraphQL\Server\ServerConfig $config
    * @param \GraphQL\Server\OperationParams $params
    *
-   * @return bool
+   * @return bool|array
    * @throws \GraphQL\Error\SyntaxError
    * @throws \GraphQL\Server\RequestError
    */
-  private function validateAPQQuery(ServerConfig $config, OperationParams $params): bool {
+  private function validateAPQQuery(ServerConfig $config, OperationParams $params) {
     $document = $this->getDocumentFromQuery($config, $params);
-    return $this->operationParamsValid($params) && $this->operationValid($config, $params, $document);
-  }
 
-  /**
-   * Check if operation params are valid.
-   *
-   * @param \GraphQL\Server\OperationParams $params
-   *
-   * @return bool
-   */
-  private function operationParamsValid(OperationParams $params) {
-    return count($this->validateOperationParams($params)) === 0;
-  }
+    // Add default validation rules.
+    $config->setValidationRules(DocumentValidator::defaultRules());
 
-  /**
-   * Check if operation is valid.
-   *
-   * @param \GraphQL\Server\ServerConfig $config
-   * @param \GraphQL\Server\OperationParams $params
-   * @param \GraphQL\Language\AST\DocumentNode $document
-   *
-   * @return bool
-   * @throws \Exception
-   */
-  private function operationValid(ServerConfig $config, OperationParams $params, DocumentNode $document) {
-    return count($this->validateOperation($config, $params, $document)) === 0;
+    $paramsErrors = $this->validateOperationParams($params);
+    if (!empty($paramsErrors)) {
+      return $paramsErrors;
+    }
+
+    $operationErrors = $this->validateOperation($config, $params, $document);
+    if (!empty($operationErrors)) {
+      return $operationErrors;
+    }
+
+    return TRUE;
   }
 
   /**
