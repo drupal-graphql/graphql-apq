@@ -1,0 +1,11 @@
+{
+  "name": "drupal/graphql_apq",
+  "type": "drupal-module",
+  "description": "Automatic Persisted Queries for Drupal's GraphQL module.",
+  "homepage": "http://drupal.org/project/graphql_apq",
+  "license": "GPL-2.0+",
+  "require": {
+    "webonyx/graphql-php": "^0.12.5"
+  },
+  "minimum-stability": "dev"
+}
